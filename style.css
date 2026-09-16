@@ -140,7 +140,7 @@ a{color:inherit;text-decoration:none;}
   background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:12px;
   display:flex;flex-direction:column;gap:10px;
 }
-.inline-form.hidden{display:none;}
+.hidden{display:none;}
 .inline-form label{font-size:12px;font-weight:600;color:var(--muted);}
 .inline-form input[type=text],.inline-form input[type=date],.inline-form textarea{
   border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:13.5px;font-family:inherit;
