@@ -13,6 +13,10 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_4fZ0DlFJq1ec5xTXurwGSQ_Ke3JELGZ
 // republicada/recriada com um nome que realmente pegue, atualize aqui.
 const PLANO_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/smooth-responder`;
 
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+
 function mostrarToast(msg, isError){
   let t = document.getElementById("toast");
   if(!t){
@@ -288,9 +292,55 @@ async function criarProjetoComIA(ev){
         enviado_por: "Documento original (anexado na criação)",
       });
     }
+
+    btn.textContent = "Gerando slides...";
+    try{
+      const imagensSlides = await gerarSlidesDoArquivo(IA_ARQUIVO);
+      let ordem = 1;
+      for(const blob of imagensSlides){
+        const caminhoSlide = projeto.id + "/" + ordem + "_" + Date.now() + ".jpg";
+        const { error: errSlideUpload } = await db.storage.from(SLIDES_BUCKET).upload(caminhoSlide, blob, { contentType: "image/jpeg" });
+        if(errSlideUpload) continue;
+        const { data: pubSlide } = db.storage.from(SLIDES_BUCKET).getPublicUrl(caminhoSlide);
+        await db.from("pa_slides").insert({ projeto_id: projeto.id, ordem, imagem_url: pubSlide.publicUrl });
+        ordem++;
+      }
+    } catch(err){
+      console.error("gerar slides do documento", err);
+    }
   }
 
   window.location.href = "projeto.html?id=" + encodeURIComponent(projeto.id);
+}
+
+// Converte o documento anexado em imagens de slide: cada página do PDF vira
+// um slide (via pdf.js, renderizado no navegador); se for uma foto/imagem
+// única, ela mesma vira o único slide.
+async function gerarSlidesDoArquivo(file){
+  if(file.type.startsWith("image/")){
+    return [file];
+  }
+  if(file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)){
+    return [];
+  }
+  if(!window.pdfjsLib){
+    return [];
+  }
+
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const blobs = [];
+  for(let i = 1; i <= pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    if(blob) blobs.push(blob);
+  }
+  return blobs;
 }
 
 // ================= PROJETO (detalhe) =================
