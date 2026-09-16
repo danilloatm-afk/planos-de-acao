@@ -402,9 +402,11 @@ function renderEtapas(){
       </div>
       <div class="stage-body">
         <div class="stage-top">
-          <p class="stage-title">${escapeHtml(e.titulo)}</p>
+          <input type="text" class="stage-title-input" value="${escapeHtml(e.titulo)}"
+            onchange="atualizarTitulo('${e.id}',this.value)">
         </div>
-        ${e.descricao ? `<p class="stage-desc">${escapeHtml(e.descricao)}</p>` : ""}
+        <textarea class="stage-desc-input" placeholder="Descrição da etapa..."
+          onchange="atualizarEtapaCampo('${e.id}','descricao',this.value)">${escapeHtml(e.descricao || "")}</textarea>
 
         <span class="meta-label">Responsáveis</span>
         <div class="resp-list">
@@ -463,6 +465,15 @@ async function atualizarEtapaCampo(etapaId, campo, valor){
   const e = ETAPAS_CACHE.find(x => x.id === etapaId);
   if(e) e[campo] = valor;
   mostrarToast("Salvo.");
+}
+
+async function atualizarTitulo(etapaId, valor){
+  if(!valor.trim()){
+    mostrarToast("O título não pode ficar vazio.", true);
+    renderEtapas();
+    return;
+  }
+  await atualizarEtapaCampo(etapaId, "titulo", valor.trim());
 }
 
 async function salvarOrdemEtapas(idsOrdenados){
