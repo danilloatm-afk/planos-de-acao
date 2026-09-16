@@ -405,7 +405,8 @@ function renderEtapas(){
           <input type="text" class="stage-title-input" value="${escapeHtml(e.titulo)}"
             onchange="atualizarTitulo('${e.id}',this.value)">
         </div>
-        <textarea class="stage-desc-input" placeholder="Descrição da etapa..."
+        <textarea class="stage-desc-input" placeholder="Descrição da etapa..." rows="1"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';"
           onchange="atualizarEtapaCampo('${e.id}','descricao',this.value)">${escapeHtml(e.descricao || "")}</textarea>
 
         <span class="meta-label">Responsáveis</span>
@@ -446,6 +447,11 @@ function renderEtapas(){
       </div>
     </div>`;
   }).join("");
+
+  wrap.querySelectorAll(".stage-desc-input").forEach(t => {
+    t.style.height = "auto";
+    t.style.height = t.scrollHeight + "px";
+  });
 }
 
 async function atualizarEtapaStatus(etapaId, status){
