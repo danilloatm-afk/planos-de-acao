@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Projeto — Planos de Ação</title>
-<link rel="stylesheet" href="style.css?v=20260916b">
+<link rel="stylesheet" href="style.css?v=20260916c">
 </head>
 <body>
 
@@ -61,7 +61,7 @@
   <div class="card">
     <h2>
       Plano de ação
-      <button class="btn btn-outline btn-sm" onclick="toggleForm('formNovaEtapa')">+ Nova etapa</button>
+      <button class="btn btn-outline btn-sm" onclick="abrirFormNovaEtapa()">+ Nova etapa</button>
     </h2>
 
     <form id="formNovaEtapa" class="inline-form hidden" onsubmit="adicionarEtapa(event)">
@@ -77,6 +77,10 @@
         <div>
           <label>Prazo sugerido (opcional, texto livre)</label>
           <input type="text" id="etapaPrazoSugerido" placeholder="Ex: 2 semanas">
+        </div>
+        <div>
+          <label>Posição</label>
+          <select id="etapaPosicao"></select>
         </div>
       </div>
       <div class="actions">
@@ -143,7 +147,7 @@
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="app.js?v=20260916b"></script>
+<script src="app.js?v=20260916c"></script>
 <script>
 document.getElementById("docEnviadoPor").value = getMeuNome();
 initProjeto();

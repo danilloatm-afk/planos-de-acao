@@ -18,6 +18,7 @@ create table if not exists pa_etapas (
   descricao text,
   prazo_sugerido text,
   responsaveis text[] not null default '{}',
+  observacoes text,
   prazo date,
   status text not null default 'nao_iniciado' check (status in ('nao_iniciado','andamento','concluido')),
   atualizado_em timestamptz not null default now()

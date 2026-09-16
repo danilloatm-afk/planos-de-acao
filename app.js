@@ -425,6 +425,11 @@ function renderEtapas(){
           </span>
           ${e.prazo_sugerido ? `<span>Sugerido: ${escapeHtml(e.prazo_sugerido)}</span>` : ""}
         </div>
+
+        <span class="meta-label">Observações</span>
+        <textarea class="obs-field" placeholder="Anotações sobre esta etapa..."
+          onchange="atualizarEtapaCampo('${e.id}','observacoes',this.value)">${escapeHtml(e.observacoes || "")}</textarea>
+
         <div class="segctl">
           ${STATUS_ORDER.map(s => `
             <button class="${e.status === s ? "active-" + s.replace("nao_iniciado","nao") : ""}"
@@ -432,6 +437,8 @@ function renderEtapas(){
           `).join("")}
         </div>
         <div class="stage-actions">
+          <button class="icon-btn" title="Mover para cima" ${idx === 0 ? "disabled" : ""} onclick="moverEtapa('${e.id}',-1)">&uarr; Mover</button>
+          <button class="icon-btn" title="Mover para baixo" ${idx === ETAPAS_CACHE.length - 1 ? "disabled" : ""} onclick="moverEtapa('${e.id}',1)">&darr; Mover</button>
           <button class="icon-btn danger" onclick="excluirEtapa('${e.id}')">Excluir etapa</button>
         </div>
       </div>
@@ -456,6 +463,22 @@ async function atualizarEtapaCampo(etapaId, campo, valor){
   const e = ETAPAS_CACHE.find(x => x.id === etapaId);
   if(e) e[campo] = valor;
   mostrarToast("Salvo.");
+}
+
+async function salvarOrdemEtapas(idsOrdenados){
+  await Promise.all(idsOrdenados.map((id, idx) =>
+    db.from("pa_etapas").update({ ordem: idx + 1 }).eq("id", id)
+  ));
+}
+
+async function moverEtapa(etapaId, direcao){
+  const idx = ETAPAS_CACHE.findIndex(e => e.id === etapaId);
+  const novoIdx = idx + direcao;
+  if(idx === -1 || novoIdx < 0 || novoIdx >= ETAPAS_CACHE.length) return;
+  const ids = ETAPAS_CACHE.map(e => e.id);
+  [ids[idx], ids[novoIdx]] = [ids[novoIdx], ids[idx]];
+  await salvarOrdemEtapas(ids);
+  await carregarEtapas(getProjetoId());
 }
 
 async function salvarResponsaveis(e){
@@ -497,21 +520,36 @@ async function excluirEtapa(etapaId){
   mostrarToast("Etapa excluída.");
 }
 
+function abrirFormNovaEtapa(){
+  const sel = document.getElementById("etapaPosicao");
+  let html = `<option value="0">No início${ETAPAS_CACHE.length ? " (antes da etapa 1)" : ""}</option>`;
+  ETAPAS_CACHE.forEach((e, idx) => {
+    html += `<option value="${idx + 1}">Depois da etapa ${idx + 1} — ${escapeHtml(e.titulo)}</option>`;
+  });
+  sel.innerHTML = html;
+  sel.value = String(ETAPAS_CACHE.length); // padrão: no final
+  document.getElementById("formNovaEtapa").classList.remove("hidden");
+}
+
 async function adicionarEtapa(ev){
   ev.preventDefault();
   const titulo = document.getElementById("etapaTitulo").value.trim();
   const descricao = document.getElementById("etapaDescricao").value.trim();
   const prazoSugerido = document.getElementById("etapaPrazoSugerido").value.trim();
+  const posicao = parseInt(document.getElementById("etapaPosicao").value, 10) || 0;
   if(!titulo){ mostrarToast("Digite o título da etapa.", true); return; }
 
-  const ordem = ETAPAS_CACHE.length ? Math.max(...ETAPAS_CACHE.map(e => e.ordem)) + 1 : 1;
-  const { error } = await db.from("pa_etapas").insert({
+  const { data: novaEtapa, error } = await db.from("pa_etapas").insert({
     projeto_id: getProjetoId(),
     titulo, descricao: descricao || null,
     prazo_sugerido: prazoSugerido || null,
-    ordem, status: statusInicial()
-  });
+    ordem: posicao + 1, status: statusInicial()
+  }).select().single();
   if(error){ tratarErro(error, "adicionar etapa"); return; }
+
+  const idsOrdenados = ETAPAS_CACHE.map(e => e.id);
+  idsOrdenados.splice(posicao, 0, novaEtapa.id);
+  await salvarOrdemEtapas(idsOrdenados);
 
   document.getElementById("etapaTitulo").value = "";
   document.getElementById("etapaDescricao").value = "";
