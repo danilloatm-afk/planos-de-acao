@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projeto — Planos de Ação</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="band">
+  <div class="band-inner">
+    <div class="band-text">
+      <a class="band-back" href="index.html">&larr; Todos os projetos</a>
+      <h1 id="projTitle">Carregando...</h1>
+      <p id="projDesc"></p>
+    </div>
+    <button class="btn btn-ghost" onclick="toggleForm('formEditarProjeto')">Editar projeto</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <form id="formEditarProjeto" class="inline-form hidden" onsubmit="salvarProjeto(event)" style="margin-bottom:24px;">
+    <div>
+      <label>Nome do projeto</label>
+      <input type="text" id="editNome" required>
+    </div>
+    <div>
+      <label>Descrição</label>
+      <textarea id="editDescricao"></textarea>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-danger btn-sm" onclick="excluirProjeto()">Excluir projeto</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="toggleForm('formEditarProjeto')">Cancelar</button>
+      <button type="submit" class="btn btn-primary btn-sm">Salvar</button>
+    </div>
+  </form>
+
+  <div class="stats">
+    <div class="stat"><span class="num" id="statTotal">–</span><span class="label">Etapas</span></div>
+    <div class="stat"><span class="num" id="statAndamento">–</span><span class="label">Em andamento</span></div>
+    <div class="stat"><span class="num" id="statDone">–</span><span class="label">Concluídas</span></div>
+    <div class="stat"><span class="num" id="statPct">–</span><span class="label">Progresso</span></div>
+  </div>
+
+  <div class="card">
+    <div class="bar-track" style="margin-bottom:4px;">
+      <div class="bar-done" id="barDone" style="width:0%"></div>
+      <div class="bar-progress" id="barProgress" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>
+      Plano de ação
+      <button class="btn btn-outline btn-sm" onclick="toggleForm('formNovaEtapa')">+ Nova etapa</button>
+    </h2>
+
+    <form id="formNovaEtapa" class="inline-form hidden" onsubmit="adicionarEtapa(event)">
+      <div>
+        <label>Título da etapa</label>
+        <input type="text" id="etapaTitulo" required>
+      </div>
+      <div>
+        <label>Descrição</label>
+        <textarea id="etapaDescricao"></textarea>
+      </div>
+      <div class="row">
+        <div>
+          <label>Prazo sugerido (opcional, texto livre)</label>
+          <input type="text" id="etapaPrazoSugerido" placeholder="Ex: 2 semanas">
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-outline btn-sm" onclick="toggleForm('formNovaEtapa')">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Adicionar etapa</button>
+      </div>
+    </form>
+
+    <div id="stepper" class="stepper" style="margin-top:16px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>
+      Documentos
+      <button class="btn btn-outline btn-sm" onclick="toggleForm('formNovoDoc')">+ Nova versão</button>
+    </h2>
+
+    <form id="formNovoDoc" class="inline-form hidden" onsubmit="enviarDocumento(event)">
+      <div>
+        <label>Arquivo</label>
+        <input type="file" id="docArquivo" required>
+      </div>
+      <div>
+        <label>Seu nome</label>
+        <input type="text" id="docEnviadoPor" placeholder="Quem está enviando">
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-outline btn-sm" onclick="toggleForm('formNovoDoc')">Cancelar</button>
+        <button type="submit" id="btnEnviarDoc" class="btn btn-primary btn-sm">Enviar</button>
+      </div>
+    </form>
+
+    <div id="docList" class="doc-list" style="margin-top:14px;"></div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+<script>
+document.getElementById("docEnviadoPor").value = getMeuNome();
+initProjeto();
+</script>
+</body>
+</html>
