@@ -170,6 +170,13 @@ async function analisarComIA(ev){
   const file = fileInput.files[0];
   if(!file){ mostrarToast("Escolha um arquivo.", true); return; }
 
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  const isImage = file.type.startsWith("image/");
+  if(!isPdf && !isImage){
+    mostrarToast("Só é possível enviar PDF ou foto/imagem. Se for PowerPoint ou Word, exporte como PDF primeiro (Arquivo > Salvar como > PDF) e envie esse arquivo.", true);
+    return;
+  }
+
   const btn = document.getElementById("btnAnalisarIA");
   btn.disabled = true;
   btn.textContent = "Analisando com IA...";
