@@ -402,12 +402,9 @@ function renderEtapas(){
       </div>
       <div class="stage-body">
         <div class="stage-top">
-          <input type="text" class="stage-title-input" value="${escapeHtml(e.titulo)}"
-            onchange="atualizarTitulo('${e.id}',this.value)">
+          <p class="stage-title">${escapeHtml(e.titulo)}</p>
         </div>
-        <textarea class="stage-desc-input" placeholder="Descrição da etapa..." rows="1"
-          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';"
-          onchange="atualizarEtapaCampo('${e.id}','descricao',this.value)">${escapeHtml(e.descricao || "")}</textarea>
+        ${e.descricao ? `<p class="stage-desc">${escapeHtml(e.descricao)}</p>` : ""}
 
         <span class="meta-label">Responsáveis</span>
         <div class="resp-list">
@@ -447,11 +444,6 @@ function renderEtapas(){
       </div>
     </div>`;
   }).join("");
-
-  wrap.querySelectorAll(".stage-desc-input").forEach(t => {
-    t.style.height = "auto";
-    t.style.height = t.scrollHeight + "px";
-  });
 }
 
 async function atualizarEtapaStatus(etapaId, status){
@@ -471,15 +463,6 @@ async function atualizarEtapaCampo(etapaId, campo, valor){
   const e = ETAPAS_CACHE.find(x => x.id === etapaId);
   if(e) e[campo] = valor;
   mostrarToast("Salvo.");
-}
-
-async function atualizarTitulo(etapaId, valor){
-  if(!valor.trim()){
-    mostrarToast("O título não pode ficar vazio.", true);
-    renderEtapas();
-    return;
-  }
-  await atualizarEtapaCampo(etapaId, "titulo", valor.trim());
 }
 
 async function salvarOrdemEtapas(idsOrdenados){
