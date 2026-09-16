@@ -294,20 +294,8 @@ async function criarProjetoComIA(ev){
     }
 
     btn.textContent = "Gerando slides...";
-    try{
-      const imagensSlides = await gerarSlidesDoArquivo(IA_ARQUIVO);
-      let ordem = 1;
-      for(const blob of imagensSlides){
-        const caminhoSlide = projeto.id + "/" + ordem + "_" + Date.now() + ".jpg";
-        const { error: errSlideUpload } = await db.storage.from(SLIDES_BUCKET).upload(caminhoSlide, blob, { contentType: "image/jpeg" });
-        if(errSlideUpload) continue;
-        const { data: pubSlide } = db.storage.from(SLIDES_BUCKET).getPublicUrl(caminhoSlide);
-        await db.from("pa_slides").insert({ projeto_id: projeto.id, ordem, imagem_url: pubSlide.publicUrl });
-        ordem++;
-      }
-    } catch(err){
-      console.error("gerar slides do documento", err);
-    }
+    try{ await substituirSlidesPeloArquivo(projeto.id, IA_ARQUIVO); }
+    catch(err){ console.error("gerar slides do documento", err); }
   }
 
   window.location.href = "projeto.html?id=" + encodeURIComponent(projeto.id);
@@ -622,12 +610,38 @@ async function enviarDocumento(ev){
   });
   if(errInsert){ tratarErro(errInsert, "registrar documento"); btn.disabled = false; btn.textContent = "Enviar"; return; }
 
+  const ehApresentavel = file.type.startsWith("image/") || file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  if(ehApresentavel){
+    btn.textContent = "Atualizando apresentação...";
+    try{ await substituirSlidesPeloArquivo(projetoId, file); }
+    catch(err){ console.error("regenerar slides", err); }
+  }
+
   fileInput.value = "";
   document.getElementById("formNovoDoc").classList.add("hidden");
   btn.disabled = false;
   btn.textContent = "Enviar";
   await carregarDocumentos(projetoId);
-  mostrarToast("Documento enviado como v" + versao + ".");
+  mostrarToast("Documento enviado como v" + versao + (ehApresentavel ? " — apresentação atualizada." : "."));
+}
+
+// Toda vez que uma nova versão de um documento apresentável (PDF/imagem) é
+// enviada, a aba Apresentação passa a refletir SEMPRE essa versão mais
+// recente — os slides antigos são descartados e substituídos pelos da nova
+// versão, em vez de acumular apresentações desatualizadas.
+async function substituirSlidesPeloArquivo(projetoId, file){
+  await db.from("pa_slides").delete().eq("projeto_id", projetoId);
+  const slides = await gerarSlidesDoArquivo(file);
+  let ordem = 1;
+  for(const blob of slides){
+    const caminho = projetoId + "/" + ordem + "_" + Date.now() + ".jpg";
+    const { error: errUp } = await db.storage.from(SLIDES_BUCKET).upload(caminho, blob, { contentType: "image/jpeg" });
+    if(errUp) continue;
+    const { data: pub } = db.storage.from(SLIDES_BUCKET).getPublicUrl(caminho);
+    await db.from("pa_slides").insert({ projeto_id: projetoId, ordem, imagem_url: pub.publicUrl });
+    ordem++;
+  }
+  await carregarSlides(projetoId);
 }
 
 // ---------- Apresentação (slides) ----------
@@ -647,6 +661,7 @@ function renderSlideViewer(){
   const empty = document.getElementById("slideEmpty");
   const viewer = document.getElementById("slideViewer");
   const delRow = document.getElementById("slideDeleteRow");
+  if(!empty || !viewer || !delRow) return; // não está na página do projeto (ex: chamado durante a criação, em index.html)
   if(SLIDES_CACHE.length === 0){
     empty.classList.remove("hidden");
     viewer.classList.add("hidden");
