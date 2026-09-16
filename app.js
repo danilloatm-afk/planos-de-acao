@@ -7,11 +7,11 @@ const DOC_BUCKET = "pa_documentos";
 // Chave publicável do mesmo projeto Supabase, usada só pra chamar o Edge
 // Function de IA (mesma chave já usada nos outros apps deste workspace).
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_4fZ0DlFJq1ec5xTXurwGSQ_Ke3JELGZ";
-// Nome do Function no Supabase pode não bater com o nome do arquivo fonte
-// (gotcha conhecido nesse projeto — o campo "Function name" do dashboard já
-// falhou em pegar o nome digitado em outros apps). Se, ao publicar, o slug
-// vier diferente de "extract-plano-acao", ajuste esta constante.
-const PLANO_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/extract-plano-acao`;
+// Nome real no Supabase é "smooth-responder" (o campo de nome não pegou
+// "extract-plano-acao" ao publicar — mesmo gotcha já visto em outros apps
+// deste workspace, ex: "rapid-service"/"rapid-action"). Se a função for
+// republicada/recriada com um nome que realmente pegue, atualize aqui.
+const PLANO_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/smooth-responder`;
 
 function mostrarToast(msg, isError){
   let t = document.getElementById("toast");
