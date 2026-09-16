@@ -20,20 +20,62 @@
 
 <div class="wrap">
 
-  <form id="formNovoProjeto" class="inline-form hidden" onsubmit="criarProjeto(event)" style="margin-bottom:24px;">
-    <div>
-      <label>Nome do projeto</label>
-      <input type="text" id="novoNome" placeholder="Ex: Saneamento do Cadastro de Produtos" required>
+  <div id="formNovoProjeto" class="inline-form hidden" style="margin-bottom:24px;">
+    <div class="segctl">
+      <button type="button" id="btnAbaEmBranco" class="active-nao" onclick="mostrarAbaNovoProjeto('branco')">Criar em branco</button>
+      <button type="button" id="btnAbaComIA" onclick="mostrarAbaNovoProjeto('ia')">Anexar documento (IA sugere o plano)</button>
     </div>
-    <div>
-      <label>Descrição (opcional)</label>
-      <textarea id="novaDescricao" placeholder="Contexto e objetivo do projeto"></textarea>
+
+    <form id="tabEmBranco" onsubmit="criarProjeto(event)" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+      <div>
+        <label>Nome do projeto</label>
+        <input type="text" id="novoNome" placeholder="Ex: Saneamento do Cadastro de Produtos" required>
+      </div>
+      <div>
+        <label>Descrição (opcional)</label>
+        <textarea id="novaDescricao" placeholder="Contexto e objetivo do projeto"></textarea>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-outline btn-sm" onclick="toggleForm('formNovoProjeto')">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Criar projeto</button>
+      </div>
+    </form>
+
+    <div id="tabComIA" class="hidden" style="margin-top:4px;">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">
+        Anexe um PDF ou foto do documento (plano, relatório, ata) e a IA lê o conteúdo e sugere um nome de projeto e as etapas do plano de ação. Você revisa e ajusta tudo antes de criar.
+      </p>
+      <form onsubmit="analisarComIA(event)" style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label>Documento (PDF ou foto)</label>
+          <input type="file" id="iaArquivo" accept="application/pdf,image/*" required>
+        </div>
+        <div class="actions">
+          <button type="submit" id="btnAnalisarIA" class="btn btn-primary btn-sm">Analisar com IA</button>
+        </div>
+      </form>
+
+      <div id="iaRevisao" class="hidden" style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+        <div>
+          <label>Nome do projeto</label>
+          <input type="text" id="iaNome" required>
+        </div>
+        <div style="margin-top:10px;">
+          <label>Descrição</label>
+          <textarea id="iaDescricao"></textarea>
+        </div>
+        <div style="margin-top:14px;">
+          <label>Etapas sugeridas (revise, edite ou remova)</label>
+          <div id="iaEtapasList" style="margin-top:8px;"></div>
+          <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="adicionarIaEtapaVazia()">+ Adicionar etapa</button>
+        </div>
+        <div class="actions" style="margin-top:14px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="toggleForm('formNovoProjeto')">Cancelar</button>
+          <button type="button" id="btnCriarComIA" class="btn btn-primary btn-sm" onclick="criarProjetoComIA(event)">Criar projeto</button>
+        </div>
+      </div>
     </div>
-    <div class="actions">
-      <button type="button" class="btn btn-outline btn-sm" onclick="toggleForm('formNovoProjeto')">Cancelar</button>
-      <button type="submit" class="btn btn-primary btn-sm">Criar projeto</button>
-    </div>
-  </form>
+  </div>
 
   <div id="projectsGrid" class="projects-grid"></div>
   <div id="empty" class="empty" style="display:none;">

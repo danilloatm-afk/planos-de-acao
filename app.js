@@ -4,6 +4,15 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const DOC_BUCKET = "pa_documentos";
 
+// Chave publicável do mesmo projeto Supabase, usada só pra chamar o Edge
+// Function de IA (mesma chave já usada nos outros apps deste workspace).
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_4fZ0DlFJq1ec5xTXurwGSQ_Ke3JELGZ";
+// Nome do Function no Supabase pode não bater com o nome do arquivo fonte
+// (gotcha conhecido nesse projeto — o campo "Function name" do dashboard já
+// falhou em pegar o nome digitado em outros apps). Se, ao publicar, o slug
+// vier diferente de "extract-plano-acao", ajuste esta constante.
+const PLANO_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/extract-plano-acao`;
+
 function mostrarToast(msg, isError){
   let t = document.getElementById("toast");
   if(!t){
@@ -133,6 +142,148 @@ async function criarProjeto(ev){
   const { data, error } = await db.from("pa_projetos").insert({ nome, descricao: descricao || null }).select().single();
   if(error){ tratarErro(error, "criar projeto"); return; }
   window.location.href = "projeto.html?id=" + encodeURIComponent(data.id);
+}
+
+// ---------- Criar projeto anexando documento (IA sugere o plano) ----------
+function arquivoParaBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo"));
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.readAsDataURL(file);
+  });
+}
+
+function mostrarAbaNovoProjeto(modo){
+  document.getElementById("tabEmBranco").classList.toggle("hidden", modo !== "branco");
+  document.getElementById("tabComIA").classList.toggle("hidden", modo !== "ia");
+  document.getElementById("btnAbaEmBranco").classList.toggle("active-nao", modo === "branco");
+  document.getElementById("btnAbaComIA").classList.toggle("active-nao", modo === "ia");
+}
+
+let IA_ARQUIVO = null;
+let IA_ETAPAS = [];
+
+async function analisarComIA(ev){
+  ev.preventDefault();
+  const fileInput = document.getElementById("iaArquivo");
+  const file = fileInput.files[0];
+  if(!file){ mostrarToast("Escolha um arquivo.", true); return; }
+
+  const btn = document.getElementById("btnAnalisarIA");
+  btn.disabled = true;
+  btn.textContent = "Analisando com IA...";
+
+  try{
+    const base64 = await arquivoParaBase64(file);
+    const resp = await fetch(PLANO_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ file_base64: base64, media_type: file.type || "application/pdf" }),
+    });
+    const resultado = await resp.json();
+    if(!resp.ok || resultado.error){ throw new Error(resultado.error || "Falha ao analisar o documento."); }
+
+    IA_ARQUIVO = file;
+    IA_ETAPAS = (resultado.data.etapas || []).map(e => ({ titulo: e.titulo || "", descricao: e.descricao || "", prazo_sugerido: e.prazo_sugerido || "" }));
+    document.getElementById("iaNome").value = resultado.data.nome_projeto || file.name;
+    document.getElementById("iaDescricao").value = resultado.data.descricao_projeto || "";
+    renderIaEtapas();
+    document.getElementById("iaRevisao").classList.remove("hidden");
+    mostrarToast("Plano sugerido — revise antes de criar o projeto.");
+  } catch(err){
+    tratarErro(err, "analisar documento");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Analisar com IA";
+  }
+}
+
+function renderIaEtapas(){
+  const wrap = document.getElementById("iaEtapasList");
+  if(IA_ETAPAS.length === 0){
+    wrap.innerHTML = `<div class="empty">Nenhuma etapa sugerida. Adicione manualmente abaixo.</div>`;
+    return;
+  }
+  wrap.innerHTML = IA_ETAPAS.map((e, idx) => `
+    <div class="inline-form" style="margin-top:${idx === 0 ? 0 : 10}px;">
+      <div class="row">
+        <div style="flex:2;">
+          <label>Título</label>
+          <input type="text" value="${escapeHtml(e.titulo)}" oninput="IA_ETAPAS[${idx}].titulo=this.value">
+        </div>
+        <div>
+          <label>Prazo sugerido</label>
+          <input type="text" value="${escapeHtml(e.prazo_sugerido)}" oninput="IA_ETAPAS[${idx}].prazo_sugerido=this.value">
+        </div>
+      </div>
+      <div>
+        <label>Descrição</label>
+        <textarea oninput="IA_ETAPAS[${idx}].descricao=this.value">${escapeHtml(e.descricao)}</textarea>
+      </div>
+      <div class="actions">
+        <button type="button" class="icon-btn danger" onclick="removerIaEtapa(${idx})">Remover etapa</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function removerIaEtapa(idx){
+  IA_ETAPAS.splice(idx, 1);
+  renderIaEtapas();
+}
+
+function adicionarIaEtapaVazia(){
+  IA_ETAPAS.push({ titulo: "", descricao: "", prazo_sugerido: "" });
+  renderIaEtapas();
+}
+
+async function criarProjetoComIA(ev){
+  ev.preventDefault();
+  const nome = document.getElementById("iaNome").value.trim();
+  const descricao = document.getElementById("iaDescricao").value.trim();
+  if(!nome){ mostrarToast("Digite o nome do projeto.", true); return; }
+  const etapasValidas = IA_ETAPAS.filter(e => e.titulo.trim());
+  if(etapasValidas.length === 0){ mostrarToast("Adicione ao menos uma etapa.", true); return; }
+
+  const btn = document.getElementById("btnCriarComIA");
+  btn.disabled = true;
+  btn.textContent = "Criando...";
+
+  const { data: projeto, error } = await db.from("pa_projetos").insert({ nome, descricao: descricao || null }).select().single();
+  if(error){ tratarErro(error, "criar projeto"); btn.disabled = false; btn.textContent = "Criar projeto"; return; }
+
+  const { error: errEtapas } = await db.from("pa_etapas").insert(etapasValidas.map((e, idx) => ({
+    projeto_id: projeto.id,
+    ordem: idx + 1,
+    titulo: e.titulo.trim(),
+    descricao: e.descricao.trim() || null,
+    prazo_sugerido: e.prazo_sugerido.trim() || null,
+    status: statusInicial(),
+  })));
+  if(errEtapas){ tratarErro(errEtapas, "salvar etapas"); }
+
+  if(IA_ARQUIVO){
+    const caminho = projeto.id + "/v1_" + Date.now() + "_" + IA_ARQUIVO.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const { error: errUpload } = await db.storage.from(DOC_BUCKET).upload(caminho, IA_ARQUIVO, { contentType: IA_ARQUIVO.type || "application/octet-stream" });
+    if(!errUpload){
+      const { data: pub } = db.storage.from(DOC_BUCKET).getPublicUrl(caminho);
+      await db.from("pa_documentos").insert({
+        projeto_id: projeto.id,
+        nome_arquivo: IA_ARQUIVO.name,
+        versao: 1,
+        arquivo_url: pub.publicUrl,
+        tamanho_bytes: IA_ARQUIVO.size,
+        enviado_por: "Documento original (anexado na criação)",
+      });
+    }
+  }
+
+  window.location.href = "projeto.html?id=" + encodeURIComponent(projeto.id);
 }
 
 // ================= PROJETO (detalhe) =================
