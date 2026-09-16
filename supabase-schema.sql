@@ -60,6 +60,26 @@ values ('11111111-1111-1111-1111-111111111111',
   'Diagnóstico, padronização e governança contínua do cadastro de produtos.')
 on conflict (id) do nothing;
 
+create table if not exists pa_slides (
+  id uuid primary key default gen_random_uuid(),
+  projeto_id uuid not null references pa_projetos(id) on delete cascade,
+  ordem int not null,
+  imagem_url text not null,
+  criado_em timestamptz not null default now()
+);
+
+alter table pa_slides enable row level security;
+create policy "pa_slides_all" on pa_slides for all using (true) with check (true);
+
+insert into storage.buckets (id, name, public)
+values ('pa_slides', 'pa_slides', true)
+on conflict (id) do nothing;
+
+create policy "pa_slides_read" on storage.objects for select
+  using (bucket_id = 'pa_slides');
+create policy "pa_slides_insert" on storage.objects for insert
+  with check (bucket_id = 'pa_slides');
+
 insert into pa_etapas (projeto_id, ordem, titulo, descricao, prazo_sugerido)
 select '11111111-1111-1111-1111-111111111111', v.ordem, v.titulo, v.descricao, v.prazo_sugerido
 from (values

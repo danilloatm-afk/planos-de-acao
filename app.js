@@ -307,6 +307,13 @@ async function initProjeto(){
 
   await carregarEtapas(id);
   await carregarDocumentos(id);
+  await carregarSlides(id);
+}
+
+function mostrarAbaProjeto(nome){
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === nome));
+  document.getElementById("tab-plano").classList.toggle("active", nome === "plano");
+  document.getElementById("tab-apresentacao").classList.toggle("active", nome === "apresentacao");
 }
 
 async function carregarEtapas(projetoId){
@@ -524,4 +531,76 @@ async function enviarDocumento(ev){
   btn.textContent = "Enviar";
   await carregarDocumentos(projetoId);
   mostrarToast("Documento enviado como v" + versao + ".");
+}
+
+// ---------- Apresentação (slides) ----------
+const SLIDES_BUCKET = "pa_slides";
+let SLIDES_CACHE = [];
+let SLIDE_IDX = 0;
+
+async function carregarSlides(projetoId){
+  const { data, error } = await db.from("pa_slides").select("*").eq("projeto_id", projetoId).order("ordem", { ascending: true });
+  if(error){ tratarErro(error, "carregar slides"); return; }
+  SLIDES_CACHE = data || [];
+  SLIDE_IDX = 0;
+  renderSlideViewer();
+}
+
+function renderSlideViewer(){
+  const empty = document.getElementById("slideEmpty");
+  const viewer = document.getElementById("slideViewer");
+  const delRow = document.getElementById("slideDeleteRow");
+  if(SLIDES_CACHE.length === 0){
+    empty.classList.remove("hidden");
+    viewer.classList.add("hidden");
+    delRow.innerHTML = "";
+    return;
+  }
+  empty.classList.add("hidden");
+  viewer.classList.remove("hidden");
+
+  document.getElementById("slideImg").src = SLIDES_CACHE[SLIDE_IDX].imagem_url;
+  document.getElementById("slideCounter").textContent = (SLIDE_IDX + 1) + " / " + SLIDES_CACHE.length;
+  document.getElementById("btnPrevSlide").disabled = SLIDE_IDX === 0;
+  document.getElementById("btnNextSlide").disabled = SLIDE_IDX === SLIDES_CACHE.length - 1;
+  delRow.innerHTML = `<button class="icon-btn danger" onclick="excluirSlideAtual()">Excluir este slide</button>`;
+}
+
+function mudarSlide(delta){
+  const novo = SLIDE_IDX + delta;
+  if(novo < 0 || novo >= SLIDES_CACHE.length) return;
+  SLIDE_IDX = novo;
+  renderSlideViewer();
+}
+
+async function enviarSlides(ev){
+  const files = Array.from(ev.target.files || []);
+  if(files.length === 0) return;
+
+  const projetoId = getProjetoId();
+  let ordem = SLIDES_CACHE.length ? Math.max(...SLIDES_CACHE.map(s => s.ordem)) + 1 : 1;
+
+  for(const file of files){
+    const caminho = projetoId + "/" + ordem + "_" + Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const { error: errUpload } = await db.storage.from(SLIDES_BUCKET).upload(caminho, file, { contentType: file.type || "image/jpeg" });
+    if(errUpload){ tratarErro(errUpload, "enviar slide"); continue; }
+    const { data: pub } = db.storage.from(SLIDES_BUCKET).getPublicUrl(caminho);
+    const { error: errInsert } = await db.from("pa_slides").insert({ projeto_id: projetoId, ordem, imagem_url: pub.publicUrl });
+    if(errInsert){ tratarErro(errInsert, "registrar slide"); continue; }
+    ordem++;
+  }
+
+  ev.target.value = "";
+  await carregarSlides(projetoId);
+  mostrarToast("Slides enviados.");
+}
+
+async function excluirSlideAtual(){
+  if(!confirmarDuploClique(event.target)) return;
+  const slide = SLIDES_CACHE[SLIDE_IDX];
+  if(!slide) return;
+  const { error } = await db.from("pa_slides").delete().eq("id", slide.id);
+  if(error){ tratarErro(error, "excluir slide"); return; }
+  await carregarSlides(getProjetoId());
+  mostrarToast("Slide excluído.");
 }

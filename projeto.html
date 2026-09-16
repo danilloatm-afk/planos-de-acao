@@ -37,6 +37,13 @@
     </div>
   </form>
 
+  <div class="tabs">
+    <button type="button" class="tab-btn active" data-tab="plano" onclick="mostrarAbaProjeto('plano')">Plano de ação</button>
+    <button type="button" class="tab-btn" data-tab="apresentacao" onclick="mostrarAbaProjeto('apresentacao')">Apresentação</button>
+  </div>
+
+  <div id="tab-plano" class="tab-panel active">
+
   <div class="stats">
     <div class="stat"><span class="num" id="statTotal">–</span><span class="label">Etapas</span></div>
     <div class="stat"><span class="num" id="statAndamento">–</span><span class="label">Em andamento</span></div>
@@ -79,6 +86,33 @@
     </form>
 
     <div id="stepper" class="stepper" style="margin-top:16px;"></div>
+  </div>
+
+  </div>
+
+  <div id="tab-apresentacao" class="tab-panel">
+    <div class="card">
+      <h2>Apresentação</h2>
+      <div id="slideEmpty" class="empty">Nenhum slide ainda. Envie imagens (JPG/PNG) da apresentação abaixo.</div>
+      <div id="slideViewer" class="slide-viewer hidden">
+        <div class="slide-frame">
+          <img id="slideImg" src="" alt="Slide da apresentação">
+        </div>
+        <div class="slide-controls">
+          <button type="button" class="btn btn-outline btn-sm" id="btnPrevSlide" onclick="mudarSlide(-1)">&larr; Anterior</button>
+          <span class="slide-counter" id="slideCounter">1 / 1</span>
+          <button type="button" class="btn btn-outline btn-sm" id="btnNextSlide" onclick="mudarSlide(1)">Próximo &rarr;</button>
+        </div>
+      </div>
+      <div class="slide-upload-row">
+        <p>Envie uma ou mais imagens para adicionar/substituir os slides.</p>
+        <label class="btn btn-outline btn-sm" style="cursor:pointer;">
+          + Enviar slides
+          <input type="file" id="slideArquivos" accept="image/*" multiple style="display:none;" onchange="enviarSlides(event)">
+        </label>
+      </div>
+      <div class="stage-actions" id="slideDeleteRow" style="margin-top:10px;"></div>
+    </div>
   </div>
 
   <div class="card">
