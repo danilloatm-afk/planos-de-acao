@@ -367,11 +367,20 @@ function renderEtapas(){
           <p class="stage-title">${escapeHtml(e.titulo)}</p>
         </div>
         ${e.descricao ? `<p class="stage-desc">${escapeHtml(e.descricao)}</p>` : ""}
+
+        <span class="meta-label">Responsáveis</span>
+        <div class="resp-list">
+          ${(e.responsaveis || []).map((r, ridx) => `
+            <span class="resp-chip">
+              <input type="text" value="${escapeHtml(r)}" placeholder="Nome"
+                onchange="atualizarResponsavel('${e.id}',${ridx},this.value)">
+              <button type="button" class="resp-remove" onclick="removerResponsavel('${e.id}',${ridx})">&times;</button>
+            </span>
+          `).join("")}
+          <button type="button" class="btn btn-outline btn-sm" onclick="adicionarResponsavel('${e.id}')">+ Adicionar responsável</button>
+        </div>
+
         <div class="stage-meta">
-          <span>Responsável:
-            <input type="text" value="${escapeHtml(e.responsavel || "")}" placeholder="—"
-              onchange="atualizarEtapaCampo('${e.id}','responsavel',this.value)">
-          </span>
           <span>Prazo:
             <input type="date" value="${e.prazo || ""}"
               onchange="atualizarEtapaCampo('${e.id}','prazo',this.value)">
@@ -409,6 +418,37 @@ async function atualizarEtapaCampo(etapaId, campo, valor){
   const e = ETAPAS_CACHE.find(x => x.id === etapaId);
   if(e) e[campo] = valor;
   mostrarToast("Salvo.");
+}
+
+async function salvarResponsaveis(e){
+  const limpo = (e.responsaveis || []).filter(r => r && r.trim());
+  const { error } = await db.from("pa_etapas").update({ responsaveis: limpo }).eq("id", e.id);
+  if(error){ tratarErro(error, "salvar responsáveis"); return; }
+  e.responsaveis = limpo;
+  renderEtapas();
+  mostrarToast("Salvo.");
+}
+
+function atualizarResponsavel(etapaId, idx, valor){
+  const e = ETAPAS_CACHE.find(x => x.id === etapaId);
+  if(!e) return;
+  e.responsaveis[idx] = valor;
+  salvarResponsaveis(e);
+}
+
+function adicionarResponsavel(etapaId){
+  const e = ETAPAS_CACHE.find(x => x.id === etapaId);
+  if(!e) return;
+  if(!e.responsaveis) e.responsaveis = [];
+  e.responsaveis.push("");
+  renderEtapas();
+}
+
+function removerResponsavel(etapaId, idx){
+  const e = ETAPAS_CACHE.find(x => x.id === etapaId);
+  if(!e) return;
+  e.responsaveis.splice(idx, 1);
+  salvarResponsaveis(e);
 }
 
 async function excluirEtapa(etapaId){
