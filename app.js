@@ -364,12 +364,29 @@ function mostrarAbaProjeto(nome){
   document.getElementById("tab-apresentacao").classList.toggle("active", nome === "apresentacao");
 }
 
+let CHECKLIST_CACHE = {};
+let HISTORICO_CACHE = {};
+let HISTORICO_ABERTO = {};
+
 async function carregarEtapas(projetoId){
   const { data, error } = await db.from("pa_etapas").select("*").eq("projeto_id", projetoId).order("ordem", { ascending: true });
   if(error){ tratarErro(error, "carregar etapas"); return; }
   ETAPAS_CACHE = data || [];
+  await carregarChecklist();
   renderEtapas();
   renderStats();
+}
+
+async function carregarChecklist(){
+  CHECKLIST_CACHE = {};
+  if(ETAPAS_CACHE.length === 0) return;
+  const ids = ETAPAS_CACHE.map(e => e.id);
+  const { data, error } = await db.from("pa_checklist").select("*").in("etapa_id", ids).order("ordem", { ascending: true });
+  if(error){ tratarErro(error, "carregar checklist"); return; }
+  (data || []).forEach(item => {
+    if(!CHECKLIST_CACHE[item.etapa_id]) CHECKLIST_CACHE[item.etapa_id] = [];
+    CHECKLIST_CACHE[item.etapa_id].push(item);
+  });
 }
 
 function renderStats(){
@@ -433,12 +450,20 @@ function renderEtapas(){
         <textarea class="obs-field" placeholder="Anotações sobre esta etapa..."
           onchange="atualizarEtapaCampo('${e.id}','observacoes',this.value)">${escapeHtml(e.observacoes || "")}</textarea>
 
+        ${renderChecklistEtapa(e.id)}
+
         <div class="segctl">
           ${STATUS_ORDER.map(s => `
             <button class="${e.status === s ? "active-" + s.replace("nao_iniciado","nao") : ""}"
               onclick="atualizarEtapaStatus('${e.id}','${s}')">${STATUS_LABEL[s]}</button>
           `).join("")}
         </div>
+
+        <button type="button" class="historico-toggle" onclick="toggleHistorico('${e.id}')">
+          ${HISTORICO_ABERTO[e.id] ? "Ocultar histórico" : "Ver histórico"}
+        </button>
+        <div id="historico-${e.id}">${HISTORICO_ABERTO[e.id] ? renderHistoricoLista(e.id) : ""}</div>
+
         <div class="stage-actions">
           <button class="icon-btn" title="Mover para cima" ${idx === 0 ? "disabled" : ""} onclick="moverEtapa('${e.id}',-1)">&uarr; Mover</button>
           <button class="icon-btn" title="Mover para baixo" ${idx === ETAPAS_CACHE.length - 1 ? "disabled" : ""} onclick="moverEtapa('${e.id}',1)">&darr; Mover</button>
@@ -449,11 +474,100 @@ function renderEtapas(){
   }).join("");
 }
 
+function renderChecklistEtapa(etapaId){
+  const itens = CHECKLIST_CACHE[etapaId] || [];
+  const feitos = itens.filter(i => i.feito).length;
+  return `
+    <span class="meta-label">Checklist${itens.length ? ` (${feitos}/${itens.length})` : ""}</span>
+    <div class="checklist">
+      ${itens.map(item => `
+        <div class="checklist-item ${item.feito ? "feito" : ""}">
+          <input type="checkbox" ${item.feito ? "checked" : ""} onchange="toggleChecklistItem('${item.id}',this.checked)">
+          <span>${escapeHtml(item.texto)}</span>
+          <button type="button" class="icon-btn danger" onclick="removerChecklistItem('${item.id}','${etapaId}')">&times;</button>
+        </div>
+      `).join("")}
+      <div class="checklist-add">
+        <input type="text" placeholder="Novo item..." id="novoItem-${etapaId}"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();adicionarChecklistItem('${etapaId}');}">
+        <button type="button" class="btn btn-outline btn-sm" onclick="adicionarChecklistItem('${etapaId}')">+ Item</button>
+      </div>
+    </div>
+  `;
+}
+
+async function toggleChecklistItem(itemId, feito){
+  const { error } = await db.from("pa_checklist").update({ feito }).eq("id", itemId);
+  if(error){ tratarErro(error, "atualizar item"); return; }
+  for(const etapaId in CHECKLIST_CACHE){
+    const item = CHECKLIST_CACHE[etapaId].find(i => i.id === itemId);
+    if(item){ item.feito = feito; break; }
+  }
+  renderEtapas();
+}
+
+async function adicionarChecklistItem(etapaId){
+  const input = document.getElementById("novoItem-" + etapaId);
+  const texto = input.value.trim();
+  if(!texto) return;
+  const itensAtuais = CHECKLIST_CACHE[etapaId] || [];
+  const ordem = itensAtuais.length ? Math.max(...itensAtuais.map(i => i.ordem)) + 1 : 1;
+  const { data, error } = await db.from("pa_checklist").insert({ etapa_id: etapaId, texto, ordem }).select().single();
+  if(error){ tratarErro(error, "adicionar item"); return; }
+  if(!CHECKLIST_CACHE[etapaId]) CHECKLIST_CACHE[etapaId] = [];
+  CHECKLIST_CACHE[etapaId].push(data);
+  renderEtapas();
+}
+
+async function removerChecklistItem(itemId, etapaId){
+  const { error } = await db.from("pa_checklist").delete().eq("id", itemId);
+  if(error){ tratarErro(error, "excluir item"); return; }
+  CHECKLIST_CACHE[etapaId] = (CHECKLIST_CACHE[etapaId] || []).filter(i => i.id !== itemId);
+  renderEtapas();
+}
+
+function renderHistoricoLista(etapaId){
+  const lista = HISTORICO_CACHE[etapaId];
+  if(!lista) return `<p class="doc-resumo-carregando">Carregando...</p>`;
+  if(lista.length === 0) return `<p class="doc-resumo-carregando">Nenhuma mudança registrada ainda.</p>`;
+  return `<ul class="historico-list">${lista.map(h => `
+    <li>${escapeHtml(h.feito_por || "Alguém")} mudou de <strong>${STATUS_LABEL[h.status_anterior] || "—"}</strong> para <strong>${STATUS_LABEL[h.status_novo]}</strong> em ${formatarData(h.feito_em)}</li>
+  `).join("")}</ul>`;
+}
+
+async function toggleHistorico(etapaId){
+  HISTORICO_ABERTO[etapaId] = !HISTORICO_ABERTO[etapaId];
+  if(HISTORICO_ABERTO[etapaId] && !HISTORICO_CACHE[etapaId]){
+    const { data, error } = await db.from("pa_etapa_historico").select("*").eq("etapa_id", etapaId).order("feito_em", { ascending: false });
+    if(error){ tratarErro(error, "carregar histórico"); return; }
+    HISTORICO_CACHE[etapaId] = data || [];
+  }
+  renderEtapas();
+}
+
 async function atualizarEtapaStatus(etapaId, status){
+  const meuNome = getMeuNome();
+  if(!meuNome){
+    mostrarToast("Preencha seu nome em \"Você:\" no topo antes de mudar o status.", true);
+    const campo = document.getElementById("meuNomeInput");
+    if(campo) campo.focus();
+    return;
+  }
+
+  const e = ETAPAS_CACHE.find(x => x.id === etapaId);
+  const statusAnterior = e ? e.status : null;
+  if(statusAnterior === status) return;
+
   const { error } = await db.from("pa_etapas").update({ status, atualizado_em: new Date().toISOString() }).eq("id", etapaId);
   if(error){ tratarErro(error, "atualizar status"); return; }
-  const e = ETAPAS_CACHE.find(x => x.id === etapaId);
   if(e) e.status = status;
+
+  const { error: errHist } = await db.from("pa_etapa_historico").insert({
+    etapa_id: etapaId, status_anterior: statusAnterior, status_novo: status, feito_por: meuNome
+  });
+  if(errHist) console.error("registrar histórico", errHist);
+  delete HISTORICO_CACHE[etapaId]; // força recarregar na próxima abertura
+
   renderEtapas();
   renderStats();
 }

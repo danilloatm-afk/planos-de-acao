@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Projeto — Planos de Ação</title>
-<link rel="stylesheet" href="style.css?v=20260917b">
+<link rel="stylesheet" href="style.css?v=20260917c">
 </head>
 <body>
 
@@ -15,7 +15,13 @@
       <h1 id="projTitle">Carregando...</h1>
       <p id="projDesc"></p>
     </div>
-    <button class="btn btn-ghost" onclick="toggleForm('formEditarProjeto')">Editar projeto</button>
+    <div class="band-actions">
+      <div class="meu-nome">
+        <label for="meuNomeInput">Você:</label>
+        <input type="text" id="meuNomeInput" placeholder="Seu nome" onchange="setMeuNome(this.value)">
+      </div>
+      <button class="btn btn-ghost" onclick="toggleForm('formEditarProjeto')">Editar projeto</button>
+    </div>
   </div>
 </div>
 
@@ -147,9 +153,10 @@
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="app.js?v=20260917b"></script>
+<script src="app.js?v=20260917c"></script>
 <script>
 document.getElementById("docEnviadoPor").value = getMeuNome();
+document.getElementById("meuNomeInput").value = getMeuNome();
 initProjeto();
 </script>
 </body>

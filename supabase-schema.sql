@@ -82,6 +82,30 @@ create policy "pa_slides_read" on storage.objects for select
 create policy "pa_slides_insert" on storage.objects for insert
   with check (bucket_id = 'pa_slides');
 
+create table if not exists pa_etapa_historico (
+  id uuid primary key default gen_random_uuid(),
+  etapa_id uuid not null references pa_etapas(id) on delete cascade,
+  status_anterior text,
+  status_novo text not null,
+  feito_por text,
+  feito_em timestamptz not null default now()
+);
+
+alter table pa_etapa_historico enable row level security;
+create policy "pa_etapa_historico_all" on pa_etapa_historico for all using (true) with check (true);
+
+create table if not exists pa_checklist (
+  id uuid primary key default gen_random_uuid(),
+  etapa_id uuid not null references pa_etapas(id) on delete cascade,
+  texto text not null,
+  feito boolean not null default false,
+  ordem int not null default 0,
+  criado_em timestamptz not null default now()
+);
+
+alter table pa_checklist enable row level security;
+create policy "pa_checklist_all" on pa_checklist for all using (true) with check (true);
+
 insert into pa_etapas (projeto_id, ordem, titulo, descricao, prazo_sugerido)
 select '11111111-1111-1111-1111-111111111111', v.ordem, v.titulo, v.descricao, v.prazo_sugerido
 from (values

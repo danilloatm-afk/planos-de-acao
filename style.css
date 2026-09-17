@@ -37,6 +37,14 @@ a{color:inherit;text-decoration:none;}
 .band-text p{color:#DCEFE6;font-size:13.5px;margin:0;}
 .band-back{color:#DCEFE6;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-bottom:8px;}
 .band-back:hover{color:#fff;}
+.band-actions{display:flex;align-items:center;gap:14px;}
+.meu-nome{display:flex;align-items:center;gap:6px;}
+.meu-nome label{color:#DCEFE6;font-size:12.5px;font-weight:600;}
+.meu-nome input{
+  border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.1);color:#fff;border-radius:7px;
+  padding:6px 10px;font-size:12.5px;width:130px;font-family:inherit;
+}
+.meu-nome input::placeholder{color:#DCEFE6;}
 
 .btn{
   border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:700;
@@ -114,6 +122,22 @@ a{color:inherit;text-decoration:none;}
 .resp-remove{border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 5px;line-height:1;}
 .resp-remove:hover{color:var(--danger);}
 .stage-meta{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+.checklist{margin:4px 0 10px;}
+.checklist-item{display:flex;align-items:center;gap:8px;padding:3px 0;}
+.checklist-item input[type=checkbox]{width:15px;height:15px;flex-shrink:0;accent-color:var(--green);}
+.checklist-item span{font-size:13px;flex:1;}
+.checklist-item.feito span{color:var(--muted);text-decoration:line-through;}
+.checklist-item .icon-btn{padding:2px 6px;font-size:12px;}
+.checklist-add{display:flex;gap:6px;margin-top:4px;}
+.checklist-add input{
+  flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12.5px;font-family:inherit;
+}
+
+.historico-toggle{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px 0;text-decoration:underline;}
+.historico-toggle:hover{color:var(--ink);}
+.historico-list{margin:6px 0 0;padding-left:0;list-style:none;font-size:11.5px;color:var(--muted);}
+.historico-list li{padding:2px 0;}
+
 .obs-field{
   width:100%;border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:12.5px;
   font-family:inherit;color:var(--ink);resize:vertical;min-height:44px;margin-bottom:10px;
