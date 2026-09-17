@@ -12,6 +12,9 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_4fZ0DlFJq1ec5xTXurwGSQ_Ke3JELGZ
 // deste workspace, ex: "rapid-service"/"rapid-action"). Se a função for
 // republicada/recriada com um nome que realmente pegue, atualize aqui.
 const PLANO_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/smooth-responder`;
+// Nome real da função "comparar-versoes" — a confirmar após o primeiro
+// deploy (mesmo gotcha do nome do Function no dashboard, ver acima).
+const COMPARE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/comparar-versoes`;
 
 if(window.pdfjsLib){
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -602,15 +605,18 @@ async function carregarDocumentos(projetoId){
     return;
   }
   wrap.innerHTML = data.map(d => `
-    <div class="doc-row">
-      <div class="doc-info">
-        <span class="doc-version">v${d.versao}</span>
-        <div class="doc-text">
-          <div class="doc-name">${escapeHtml(d.nome_arquivo)}</div>
-          <div class="doc-meta">${escapeHtml(d.enviado_por || "—")} · ${formatarData(d.enviado_em)} ${d.tamanho_bytes ? "· " + formatarTamanho(d.tamanho_bytes) : ""}</div>
+    <div class="doc-item" data-doc-id="${d.id}">
+      <div class="doc-row">
+        <div class="doc-info">
+          <span class="doc-version">v${d.versao}</span>
+          <div class="doc-text">
+            <div class="doc-name">${escapeHtml(d.nome_arquivo)}</div>
+            <div class="doc-meta">${escapeHtml(d.enviado_por || "—")} · ${formatarData(d.enviado_em)} ${d.tamanho_bytes ? "· " + formatarTamanho(d.tamanho_bytes) : ""}</div>
+          </div>
         </div>
+        <a class="btn btn-outline btn-sm" href="${d.arquivo_url}" target="_blank" rel="noopener">Baixar</a>
       </div>
-      <a class="btn btn-outline btn-sm" href="${d.arquivo_url}" target="_blank" rel="noopener">Baixar</a>
+      ${d.resumo_mudancas ? `<p class="doc-resumo">🤖 ${escapeHtml(d.resumo_mudancas)}</p>` : ""}
     </div>
   `).join("");
 }
@@ -629,23 +635,24 @@ async function enviarDocumento(ev){
   btn.textContent = "Enviando...";
 
   const projetoId = getProjetoId();
-  const { data: existentes, error: errCount } = await db.from("pa_documentos").select("versao").eq("projeto_id", projetoId).order("versao", { ascending: false }).limit(1);
+  const { data: existentes, error: errCount } = await db.from("pa_documentos").select("*").eq("projeto_id", projetoId).order("versao", { ascending: false }).limit(1);
   if(errCount){ tratarErro(errCount, "verificar versão"); btn.disabled = false; btn.textContent = "Enviar"; return; }
-  const versao = (existentes && existentes.length) ? existentes[0].versao + 1 : 1;
+  const versaoAnterior = (existentes && existentes.length) ? existentes[0] : null;
+  const versao = versaoAnterior ? versaoAnterior.versao + 1 : 1;
 
   const caminho = projetoId + "/v" + versao + "_" + Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const { error: errUpload } = await db.storage.from(DOC_BUCKET).upload(caminho, file, { contentType: file.type || "application/octet-stream" });
   if(errUpload){ tratarErro(errUpload, "enviar arquivo"); btn.disabled = false; btn.textContent = "Enviar"; return; }
 
   const { data: pub } = db.storage.from(DOC_BUCKET).getPublicUrl(caminho);
-  const { error: errInsert } = await db.from("pa_documentos").insert({
+  const { data: novoDoc, error: errInsert } = await db.from("pa_documentos").insert({
     projeto_id: projetoId,
     nome_arquivo: file.name,
     versao,
     arquivo_url: pub.publicUrl,
     tamanho_bytes: file.size,
     enviado_por: nome
-  });
+  }).select().single();
   if(errInsert){ tratarErro(errInsert, "registrar documento"); btn.disabled = false; btn.textContent = "Enviar"; return; }
 
   const ehApresentavel = file.type.startsWith("image/") || file.type === "application/pdf" || /\.pdf$/i.test(file.name);
@@ -655,12 +662,50 @@ async function enviarDocumento(ev){
     catch(err){ console.error("regenerar slides", err); }
   }
 
+  if(ehApresentavel && versaoAnterior){
+    const anteriorEhApresentavel = /\.pdf$/i.test(versaoAnterior.nome_arquivo) || /\.(jpe?g|png|gif|webp)$/i.test(versaoAnterior.nome_arquivo);
+    if(anteriorEhApresentavel){
+      btn.textContent = "Comparando com versão anterior...";
+      try{ await gerarResumoMudancas(novoDoc.id, versaoAnterior, file); }
+      catch(err){ console.error("comparar versões", err); }
+    }
+  }
+
   fileInput.value = "";
   document.getElementById("formNovoDoc").classList.add("hidden");
   btn.disabled = false;
   btn.textContent = "Enviar";
   await carregarDocumentos(projetoId);
   mostrarToast("Documento enviado como v" + versao + (ehApresentavel ? " — apresentação atualizada." : "."));
+}
+
+// Compara a nova versão com a anterior via IA e grava um resumo do que
+// mudou, direto na linha do documento recém-criado.
+async function gerarResumoMudancas(novoDocId, docAnterior, arquivoNovo){
+  const respAnterior = await fetch(docAnterior.arquivo_url);
+  const blobAnterior = await respAnterior.blob();
+  const base64Anterior = await arquivoParaBase64(blobAnterior);
+  const base64Novo = await arquivoParaBase64(arquivoNovo);
+
+  const mediaTypeAnterior = /\.pdf$/i.test(docAnterior.nome_arquivo) ? "application/pdf" : (blobAnterior.type || "image/jpeg");
+  const mediaTypeNovo = arquivoNovo.type || (/\.pdf$/i.test(arquivoNovo.name) ? "application/pdf" : "image/jpeg");
+
+  const resp = await fetch(COMPARE_FUNCTION_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({
+      arquivo_anterior_base64: base64Anterior, media_type_anterior: mediaTypeAnterior,
+      arquivo_novo_base64: base64Novo, media_type_novo: mediaTypeNovo,
+    }),
+  });
+  const resultado = await resp.json();
+  if(!resp.ok || resultado.error){ throw new Error(resultado.error || "Falha ao comparar versões."); }
+
+  await db.from("pa_documentos").update({ resumo_mudancas: resultado.data.resumo }).eq("id", novoDocId);
 }
 
 // Toda vez que uma nova versão de um documento apresentável (PDF/imagem) é

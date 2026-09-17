@@ -32,7 +32,8 @@ create table if not exists pa_documentos (
   arquivo_url text not null,
   tamanho_bytes bigint,
   enviado_por text,
-  enviado_em timestamptz not null default now()
+  enviado_em timestamptz not null default now(),
+  resumo_mudancas text
 );
 
 alter table pa_projetos enable row level security;
