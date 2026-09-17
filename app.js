@@ -12,9 +12,9 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_4fZ0DlFJq1ec5xTXurwGSQ_Ke3JELGZ
 // deste workspace, ex: "rapid-service"/"rapid-action"). Se a função for
 // republicada/recriada com um nome que realmente pegue, atualize aqui.
 const PLANO_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/smooth-responder`;
-// Nome real da função "comparar-versoes" — a confirmar após o primeiro
-// deploy (mesmo gotcha do nome do Function no dashboard, ver acima).
-const COMPARE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/comparar-versoes`;
+// Nome real no Supabase é "rapid-handler" (mesmo gotcha do nome do
+// Function no dashboard, ver acima) — confirmado via curl direto.
+const COMPARE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/rapid-handler`;
 
 if(window.pdfjsLib){
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
